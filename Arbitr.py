@@ -84,7 +84,6 @@ class StockMarket():
 
         if (currency_value_name in self.balance.keys()):
 
-            print(self.balance[currency_value_name]['value'])
 
             if (self.balance[currency_value_name]['value'] >= expenses):
                 self.balance[currency_value_name]['value'] = self.balance[currency_value_name]['value'] - expenses
@@ -110,7 +109,7 @@ class Arbitr():
         # (на данный момент поддерживается только один запрос на одну валютную пару,
         # в случае отправки туда листа валютных пар можно в цикле генерировать лист REST запросов)
 
-        self.stock_market_1_request = f"{stock_market_1['url']}/api/v5/market/ticker?instId={stock_market_1['symbol']}"
+        self.stock_market_1_request = f"{stock_market_1['url']}{stock_market_1['symbol']}"
         self.stock_market_1_name = stock_market_1['name']
 
         self.stock_market_2 = stock_market_2['stock_market']
@@ -120,14 +119,15 @@ class Arbitr():
         #   поэтому было принято решение использовать там REST запрос, что облечает синхронизацию потока данных, но в общем случае не лучшая практика
         #   ,поэтому хорошей идеей будет выбрать один метод и работать с ним, в случае надобности модификация кода не займёт много времени,
         #   придёться несколько методов которые идут дальше)
-        self.stock_market_2_socket = f"wss://stream.binance.com:9443/ws/{stock_market_2['symbol']}t@kline_{stock_market_2['interval']}"
+        # self.stock_market_2_socket = f"wss://stream.binance.com:9443/ws/btcusdt@kline_{stock_market_2['interval']}"
+        self.stock_market_2_request = f"{stock_market_2['url']}{stock_market_2['symbol']}"
         self.stock_market_2_name = stock_market_2['name']
-        self.stock_market_2_WebSocket = websocket.WebSocketApp(
-                                    self.stock_market_2_socket,
-                                    on_open= self.on_open,
-                                    on_error= self.on_error,
-                                    on_message=self.on_message,
-                                    on_close=self.on_close)
+        # self.stock_market_2_WebSocket = websocket.WebSocketApp(
+        #                             self.stock_market_2_socket,
+        #                             on_open= self.on_open,
+        #                             on_error= self.on_error,
+        #                             on_message=self.on_message,
+        #                             on_close=self.on_close)
 
         # Название файла в который будет записываться результат работы, формат csv выбран ввиду удобства и гибкости при работе с ним
         self.output_file_name = 'Result.csv'
@@ -141,29 +141,38 @@ class Arbitr():
         self.current_profit = 0
 
         pass
-    # При открытии сокета пишем, то он открыт
-    def on_open(self, msg):
-        print('OPEN')
 
-    # При ошибки сокета выводим ошибку
-    def on_error(self, error, msg):
-        print(msg)
-    # При получения сообщения реализуем часть логики работы системы
-    def on_message(self, ws, msg):
+    # # При открытии сокета пишем, то он открыт
+    # def on_open(self, msg):
+    #     print('OPEN')
+    #
+    # # При ошибки сокета выводим ошибку
+    # def on_error(self, error, msg):
+    #     print(msg)
+    # # При получения сообщения реализуем часть логики работы системы
+    # def on_message(self, ws, msg):
+    #
+    #     # Посылаем REST запрос на получение цены c первой биржи
+    #     stock_market_1_ticker = requests.get(self.stock_market_1_request).json()
+    #     # Парсим сообщение полученное от вебсокета
+    #     # stock_market_2_ticker = json.loads(msg)
+    #     stock_market_2_ticker = requests.get(self.stock_market_2_request).json()
+    #
+    #     print(stock_market_1_ticker)
+    #     # Запоминаем цены в экземлярах класса StockMarcket
+    #     # self.stock_market_2.update_price('BTC', float(stock_market_2_ticker['k']['c']))
+    #     self.stock_market_2.update_price('BTC', float(stock_market_2_ticker['price']))
+    #     self.stock_market_1.update_price('BTC', float(stock_market_1_ticker['data'][0]['last']))
+    #
+    #     # Запускаем реализацию стратегии
+    #     self.strategy()
+    #     # Запускаем запись данных в файл
+    #     self.write_to_file()
+    #
+    # # Закрываем сокет
+    # def on_close(self, ws):
+    #     print('CLOSE')
 
-        # Посылаем REST запрос на получение цены c первой биржи
-        stock_market_1_ticker = requests.get(self.stock_market_1_request).json()
-        # Парсим сообщение полученное от вебсокета
-        stock_market_2_ticker = json.loads(msg)
-
-        # Запоминаем цены в экземлярах класса StockMarcket
-        self.stock_market_2.update_price('BTC', float(stock_market_2_ticker['k']['c']))
-        self.stock_market_1.update_price('BTC', float(stock_market_1_ticker['data'][0]['last']))
-
-        # Запускаем реализацию стратегии
-        self.strategy()
-        # Запускаем запись данных в файл
-        self.write_to_file()
 
     # Метод эмулирующий межбирживые транзакции
     def Transfer_value(self, sender, taker, value_name, quantity):
@@ -285,15 +294,35 @@ class Arbitr():
         current_sum = self.stock_market_1.balance['USD']['value'] + self.stock_market_2.balance['USD']['value']
         self.current_profit = current_sum - prev_sum
 
-    # Фиксируем прибыль
-    def on_close(self, ws):
-        print('CLOSE')
+
+
+    def runtime(self):
+        while True:
+
+
+            # Посылаем REST запрос на получение цены c первой биржи
+            stock_market_1_ticker = requests.get(self.stock_market_1_request, timeout=3).json()
+
+            # stock_market_2_ticker = json.loads(msg)
+            # Посылаем REST запрос на получение цены cо второй биржи
+            stock_market_2_ticker = requests.get(self.stock_market_2_request, timeout=3).json()
+
+            # Запоминаем цены в экземлярах класса StockMarcket
+            # self.stock_market_2.update_price('BTC', float(stock_market_2_ticker['k']['c']))
+            self.stock_market_2.update_price('BTC', float(stock_market_2_ticker['price']))
+            self.stock_market_1.update_price('BTC', float(stock_market_1_ticker['data'][0]['last']))
+
+            # Запускаем реализацию стратегии
+            self.strategy()
+            # Запускаем запись данных в файл
+            self.write_to_file()
+            time.sleep(2)
 
     # Метод запукска работы бота
     def start(self):
 
         # Реализацию стратегии работы отправляем в отдельный тред, чтобы можно было в реальном времени визуализировать данные
-        t1 = threading.Thread(target=self.stock_market_2_WebSocket.run_forever)
+        t1 = threading.Thread(target=self.runtime)
         t1.start()
 
         # Ожидаем пока не создаться файл с данными
@@ -313,13 +342,13 @@ class Arbitr():
         x = range(0, len(data[f'{self.stock_market_2_name}_current_price'].values))
 
         # Создаём график движение цены на первой бирже
-        y = data[f'{self.stock_market_2_name}_current_price'].values
+        y = data[f'{self.stock_market_1_name}_current_price'].values
         self.ax[0].clear()
         self.ax[0].plot(x,y)
-        self.ax[0].set_title(f'{self.stock_market_2_name}_price')
+        self.ax[0].set_title(f'{self.stock_market_1_name}_price')
 
         # Создаём график движение цены на второй бирже
-        y = data[f'{self.stock_market_1_name}_current_price'].values
+        y = data[f'{self.stock_market_2_name}_current_price'].values
         self.ax[1].clear()
         self.ax[1].plot(x,y)
         self.ax[1].set_title(f'{self.stock_market_2_name}_price')
@@ -338,7 +367,7 @@ def main():
     #Создаём условия для первой биржи
     stock_marcket_1 = {
         'name': 'Okex',
-        'url': 'https://www.okex.com',
+        'url': 'https://www.okex.com/api/v5/market/ticker?instId=',
         'symbol': 'BTC-USDT',
         'stock_market': StockMarket(
             {
@@ -354,11 +383,13 @@ def main():
         )
     }
 
+    # https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT
     # Создаём условия для второй биржи
     stock_marcket_2 = {
         'name': 'Binance',
+        'url': 'https://api.binance.com/api/v3/ticker/price?symbol=',
         'interval': '1m',
-        'symbol': 'btcusd',
+        'symbol': 'BTCUSDT',
         'stock_market': StockMarket(
             {
                 'USD': {
